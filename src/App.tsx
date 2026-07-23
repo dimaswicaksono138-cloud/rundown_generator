@@ -7,6 +7,7 @@ function App() {
   const [title, setTitle] = useState('Rundown Acara Tanggal 20 Juli 2026');
   
   // Form states
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [activity, setActivity] = useState('');
@@ -30,21 +31,45 @@ function App() {
     localStorage.setItem('rundown_title_v2', newTitle);
   };
   
-  const handleAddRow = (e: React.FormEvent) => {
+  const handleStartEdit = (row: RowData) => {
+    setEditingId(row.id);
+    setDate(row.date);
+    setTime(row.time);
+    setActivity(row.activity);
+    setPic(row.pic);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setTime('');
+    setActivity('');
+    setPic('');
+  };
+
+  const handleAddOrUpdateRow = (e: React.FormEvent) => {
     e.preventDefault();
     if (!date || !time || !activity || !pic) {
       alert('Lengkapi semua field!');
       return;
     }
     
-    const newRow: RowData = {
-      id: Date.now().toString(),
-      date,
-      time,
-      activity,
-      pic
-    };
-    saveRows([...rows, newRow]);
+    if (editingId) {
+      const updatedRows = rows.map((r) =>
+        r.id === editingId ? { ...r, date, time, activity, pic } : r
+      );
+      saveRows(updatedRows);
+      setEditingId(null);
+    } else {
+      const newRow: RowData = {
+        id: Date.now().toString(),
+        date,
+        time,
+        activity,
+        pic
+      };
+      saveRows([...rows, newRow]);
+    }
     
     // Clear inputs except date to speed up entering multiple activities for the same date
     setTime('');
@@ -53,6 +78,9 @@ function App() {
   };
   
   const handleDeleteRow = (id: string) => {
+    if (editingId === id) {
+      handleCancelEdit();
+    }
     saveRows(rows.filter((r) => r.id !== id));
   };
   
@@ -81,7 +109,9 @@ function App() {
       <div className="dashboard-grid">
         {/* Form Input Container */}
         <div className="card form-container">
-          <h2 style={{ marginBottom: '1.5rem', color: 'var(--primary)' }}>Tambah Kegiatan</h2>
+          <h2 style={{ marginBottom: '1.5rem', color: 'var(--primary)' }}>
+            {editingId ? '✏️ Edit Kegiatan' : 'Tambah Kegiatan'}
+          </h2>
           
           <div className="form-group">
             <label>Judul Dokumen PDF</label>
@@ -96,7 +126,7 @@ function App() {
 
           <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '1rem 0' }} />
 
-          <form onSubmit={handleAddRow}>
+          <form onSubmit={handleAddOrUpdateRow}>
             <div className="form-group">
               <label>Tanggal</label>
               <input 
@@ -137,9 +167,20 @@ function App() {
                 onChange={(e) => setPic(e.target.value)} 
               />
             </div>
-            <button type="submit" className="btn btn-primary w-full" style={{ marginTop: '1rem' }}>
-              + Tambah ke Daftar
-            </button>
+            {editingId ? (
+              <div className="flex gap-2" style={{ marginTop: '1rem' }}>
+                <button type="submit" className="btn btn-primary flex-1">
+                  ✓ Simpan
+                </button>
+                <button type="button" onClick={handleCancelEdit} className="btn btn-secondary">
+                  Batal
+                </button>
+              </div>
+            ) : (
+              <button type="submit" className="btn btn-primary w-full" style={{ marginTop: '1rem' }}>
+                + Tambah ke Daftar
+              </button>
+            )}
           </form>
         </div>
 
@@ -152,7 +193,6 @@ function App() {
              </button>
            </div>
            
-
 
            {rows.length === 0 ? (
              <div className="empty-state">
@@ -168,20 +208,25 @@ function App() {
                      <th>Waktu</th>
                      <th>Kegiatan</th>
                      <th>PIC</th>
-                     <th style={{ width: '80px', textAlign: 'center' }}>Aksi</th>
+                     <th style={{ width: '150px', textAlign: 'center' }}>Aksi</th>
                    </tr>
                  </thead>
                  <tbody>
                    {rows.map((row) => (
-                     <tr key={row.id}>
+                     <tr key={row.id} className={editingId === row.id ? 'row-editing' : ''}>
                        <td data-label="Tanggal"><span className="badge badge-primary">{row.date}</span></td>
                        <td data-label="Waktu" style={{ fontWeight: 'bold' }}>{row.time}</td>
                        <td data-label="Kegiatan">{row.activity}</td>
                        <td data-label="PIC" style={{ color: 'var(--text-secondary)' }}>{row.pic}</td>
-                       <td data-label="">
-                         <button onClick={() => handleDeleteRow(row.id)} className="btn btn-danger btn-sm" title="Hapus">
-                           🗑 Hapus
-                         </button>
+                       <td data-label="Aksi">
+                         <div className="action-buttons-group">
+                           <button onClick={() => handleStartEdit(row)} className="btn btn-secondary btn-sm" title="Edit">
+                             ✏️ Edit
+                           </button>
+                           <button onClick={() => handleDeleteRow(row.id)} className="btn btn-danger btn-sm" title="Hapus">
+                             🗑 Hapus
+                           </button>
+                         </div>
                        </td>
                      </tr>
                    ))}
@@ -189,8 +234,8 @@ function App() {
                </table>
              </div>
            )}
-        </div>
-      </div>
+         </div>
+       </div>
 
       {/* Komponen Hidden untuk Dirender ke PDF (Off-Screen) */}
       <div style={{ position: 'absolute', top: '-10000px', left: '-10000px' }}>
